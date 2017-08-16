@@ -1,0 +1,50 @@
+plugins {
+    id "com.eriwen.gradle.js" version "2.14.1"
+}
+
+javascript.source {
+    custom {
+        js {
+            srcDir projectDir
+            include "*.js"
+        }
+    }
+}
+
+javascript.source.custom.js.each { File file ->
+    tasks.create(name: "dominifyJs_${file.name}", type: com.eriwen.gradle.js.tasks.MinifyJsTask) {
+        source = file
+        dest = "${buildDir}/${file.name}"
+        closure {
+            compilationLevel = "SIMPLE_OPTIMIZATIONS"
+            warningLevel = "QUIET"
+        }
+    }
+}
+
+task copyPhantomJs(type: Copy) {
+    from projectDir
+    into buildDir
+    include "*.exe"
+}
+
+task copyDependencies(type: Copy) {
+    from "${projectDir}/dep"
+    into "${buildDir}/dep"
+    include "*.js"
+}
+
+task processJs(dependsOn: tasks.matching { Task task -> task.name.startsWith("dominifyJs") })
+
+task zip(type: Zip) {
+    from buildDir
+    destinationDir buildDir
+    include "*.js"
+    include "*.exe"
+    include "dep/*.js"
+    archiveName "bank-web-scraper.zip"
+}
+
+copyPhantomJs.dependsOn processJs
+copyDependencies.dependsOn copyPhantomJs
+zip.dependsOn copyDependencies
