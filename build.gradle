@@ -39,7 +39,7 @@ task processJs(dependsOn: tasks.matching { Task task -> task.name.startsWith("do
 task zip(type: Zip) {
     from buildDir
     destinationDir buildDir
-    include "*.js"
+    include "src/js/*.js"
     include "*.exe"
     include "dep/*.js"
     archiveName "bank-web-scraper.zip"
