@@ -8,7 +8,7 @@ javascript.source {
     custom {
         js {
             srcDir projectDir
-            include "*.js"
+            include "src/main/js/*.js"
         }
     }
 }
@@ -16,12 +16,16 @@ javascript.source {
 javascript.source.custom.js.each { File file ->
     tasks.create(name: "dominifyJs_${file.name}", type: MinifyJsTask) {
         source = file
-        dest = "${buildDir}/${file.name}"
+        dest = "${buildDir}/minified/${file.name}"
         closure {
             compilationLevel = "SIMPLE_OPTIMIZATIONS"
             warningLevel = "QUIET"
         }
     }
+}
+
+task cleanBuildDir {
+    new File("${buildDir}").deleteDir()
 }
 
 task copyPhantomJs(type: Copy) {
@@ -39,7 +43,7 @@ task copyDependencies(type: Copy) {
 task processJs(dependsOn: tasks.matching { Task task -> task.name.startsWith("dominifyJs") })
 
 task zip(type: Zip) {
-    from buildDir
+    from "${buildDir}/minified"
     destinationDir buildDir
     include "*.js"
     include "*.exe"
@@ -47,6 +51,7 @@ task zip(type: Zip) {
     archiveName "bank-web-scraper.zip"
 }
 
+processJs.dependsOn cleanBuildDir
 copyPhantomJs.dependsOn processJs
 copyDependencies.dependsOn copyPhantomJs
 zip.dependsOn copyDependencies
