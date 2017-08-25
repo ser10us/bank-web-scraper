@@ -1,3 +1,5 @@
+import com.eriwen.gradle.js.tasks.MinifyJsTask
+
 plugins {
     id "com.eriwen.gradle.js" version "2.14.1"
 }
@@ -12,7 +14,7 @@ javascript.source {
 }
 
 javascript.source.custom.js.each { File file ->
-    tasks.create(name: "dominifyJs_${file.name}", type: com.eriwen.gradle.js.tasks.MinifyJsTask) {
+    tasks.create(name: "dominifyJs_${file.name}", type: MinifyJsTask) {
         source = file
         dest = "${buildDir}/${file.name}"
         closure {
