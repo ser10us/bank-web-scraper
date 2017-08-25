@@ -1,8 +1,16 @@
 import com.eriwen.gradle.js.tasks.MinifyJsTask
+import de.undercouch.gradle.tasks.download.Download
 
 plugins {
     id "com.eriwen.gradle.js" version "2.14.1"
+    id "de.undercouch.download" version "3.2.0"
 }
+
+ext.PHANTOM_JS_VERSION = "2.1.1"
+ext.PHANTOM_JS_PLATFORM = "windows"
+ext.PHANTOM_JS_FILENAME = "phantomjs-" + PHANTOM_JS_VERSION + "-" + PHANTOM_JS_PLATFORM
+ext.PHANTOM_JS_BINARIES_DIR = "phantomjs-binaries"
+ext.PHANTOM_JS_BINARIES_UNPACKED_DIR = PHANTOM_JS_BINARIES_DIR + "/unpacked"
 
 javascript.source {
     custom {
@@ -16,7 +24,7 @@ javascript.source {
 javascript.source.custom.js.each { File file ->
     tasks.create(name: "dominifyJs_${file.name}", type: MinifyJsTask) {
         source = file
-        dest = "${buildDir}/minified/${file.name}"
+        dest = "${buildDir}/minifiedJs/${file.name}"
         closure {
             compilationLevel = "SIMPLE_OPTIMIZATIONS"
             warningLevel = "QUIET"
@@ -26,6 +34,18 @@ javascript.source.custom.js.each { File file ->
 
 task cleanBuildDir {
     new File("${buildDir}").deleteDir()
+}
+
+task downloadPhantomJs(type: Download) {
+    def phantomJsZipFileName = PHANTOM_JS_FILENAME + ".zip"
+    src "https://bitbucket.org/ariya/phantomjs/downloads/" + phantomJsZipFileName
+    dest PHANTOM_JS_BINARIES_DIR + "/" + phantomJsZipFileName
+    overwrite false
+}
+
+task unzipPhantomJs(dependsOn: downloadPhantomJs, type: Copy) {
+    from zipTree(downloadPhantomJs.dest)
+    into PHANTOM_JS_BINARIES_UNPACKED_DIR
 }
 
 task copyPhantomJs(type: Copy) {
@@ -43,15 +63,21 @@ task copyDependencies(type: Copy) {
 task processJs(dependsOn: tasks.matching { Task task -> task.name.startsWith("dominifyJs") })
 
 task zip(type: Zip) {
-    from "${buildDir}/minified"
+    from("${buildDir}/minifiedJs") {
+        include("*.js")
+    }
+
+    from(PHANTOM_JS_BINARIES_UNPACKED_DIR + "/" + PHANTOM_JS_FILENAME + "/bin") {
+        include("phantomjs.exe")
+    }
+
     destinationDir buildDir
-    include "*.js"
-    include "*.exe"
-    include "dep/*.js"
+
     archiveName "bank-web-scraper.zip"
 }
 
-processJs.dependsOn cleanBuildDir
+unzipPhantomJs.dependsOn cleanBuildDir
+processJs.dependsOn unzipPhantomJs
 copyPhantomJs.dependsOn processJs
 copyDependencies.dependsOn copyPhantomJs
 zip.dependsOn copyDependencies
