@@ -1,13 +1,33 @@
 import com.eriwen.gradle.js.tasks.MinifyJsTask
 import de.undercouch.gradle.tasks.download.Download
+import org.apache.tools.ant.taskdefs.condition.Os
 
 plugins {
     id "com.eriwen.gradle.js" version "2.14.1"
     id "de.undercouch.download" version "3.2.0"
 }
 
+ext.PHANTOM_JS_ARCHIVE_EXT = ".zip"
+ext.PHANTOM_JS_BINARY_NAME = "phantomjs"
+
+if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+    ext.PHANTOM_JS_PLATFORM = "windows"
+    ext.PHANTOM_JS_BINARY_NAME += ".exe"
+} else if (Os.isFamily(Os.FAMILY_MAC)) {
+    ext.PHANTOM_JS_PLATFORM = "macosx"
+} else if (Os.isFamily(Os.FAMILY_UNIX)) {
+    ext.PHANTOM_JS_PLATFORM = "linux"
+    if (System.properties["os.arch"] == "amd64") {
+        ext.PHANTOM_JS_PLATFORM += "-x86_64"
+    } else {
+        ext.PHANTOM_JS_PLATFORM += "-i686"
+    }
+    ext.PHANTOM_JS_ARCHIVE_EXT = ".tar.bz2"
+} else {
+    throw new GradleException("Unsupported OS")
+}
+
 ext.PHANTOM_JS_VERSION = "2.1.1"
-ext.PHANTOM_JS_PLATFORM = "windows"
 ext.PHANTOM_JS_FILENAME = "phantomjs-" + PHANTOM_JS_VERSION + "-" + PHANTOM_JS_PLATFORM
 ext.PHANTOM_JS_BINARIES_DIR = "phantomjs-binaries"
 ext.PHANTOM_JS_BINARIES_UNPACKED_DIR = PHANTOM_JS_BINARIES_DIR + "/unpacked"
@@ -37,21 +57,27 @@ task cleanBuildDir {
 }
 
 task downloadPhantomJs(type: Download) {
-    def phantomJsZipFileName = PHANTOM_JS_FILENAME + ".zip"
+    def phantomJsZipFileName = PHANTOM_JS_FILENAME + PHANTOM_JS_ARCHIVE_EXT
+    def fullPath = PHANTOM_JS_BINARIES_DIR + "/" + phantomJsZipFileName
     src "https://bitbucket.org/ariya/phantomjs/downloads/" + phantomJsZipFileName
     dest PHANTOM_JS_BINARIES_DIR + "/" + phantomJsZipFileName
-    overwrite false
+    if (new File(fullPath).exists()) {
+        logger.warn "PhantomJS archive already exists."
+        overwrite false
+    }
 }
 
-task unzipPhantomJs(dependsOn: downloadPhantomJs, type: Copy) {
-    from zipTree(downloadPhantomJs.dest)
-    into PHANTOM_JS_BINARIES_UNPACKED_DIR
+task unzipPhantomJs(type: Copy) {
+    if (downloadPhantomJs.dest) {
+        from zipTree(downloadPhantomJs.dest)
+        into PHANTOM_JS_BINARIES_UNPACKED_DIR
+    }
 }
 
 task copyPhantomJs(type: Copy) {
-    from projectDir
+    from "${PHANTOM_JS_BINARIES_UNPACKED_DIR}/${PHANTOM_JS_FILENAME}/bin"
     into buildDir
-    include "*.exe"
+    include PHANTOM_JS_BINARY_NAME
 }
 
 task copyDependencies(type: Copy) {
@@ -68,7 +94,7 @@ task zip(type: Zip) {
     }
 
     from(PHANTOM_JS_BINARIES_UNPACKED_DIR + "/" + PHANTOM_JS_FILENAME + "/bin") {
-        include("phantomjs.exe")
+        include(PHANTOM_JS_BINARY_NAME)
     }
 
     destinationDir buildDir
@@ -76,7 +102,8 @@ task zip(type: Zip) {
     archiveName "bank-web-scraper.zip"
 }
 
-unzipPhantomJs.dependsOn cleanBuildDir
+downloadPhantomJs.dependsOn cleanBuildDir
+unzipPhantomJs.dependsOn downloadPhantomJs
 processJs.dependsOn unzipPhantomJs
 copyPhantomJs.dependsOn processJs
 copyDependencies.dependsOn copyPhantomJs
